@@ -260,13 +260,17 @@
   <!-- Step 2: Photos -->
   <div class="card">
     <div class="card-label">03 — Foto Testimoni</div>
-    <div class="dropzone" id="photos-zone">
-      <input type="file" id="photos-input" accept="image/*" multiple />
+    <!-- Hidden input, triggered via button to fix mobile multi-select -->
+    <input type="file" id="photos-input" accept="image/jpeg,image/jpg,image/png,image/webp" multiple style="display:none" />
+    <div id="photos-zone" class="dropzone" onclick="document.getElementById('photos-input').click()">
       <div class="icon">📸</div>
-      <div class="dz-title">Upload foto (bisa banyak sekaligus)</div>
-      <div class="dz-sub">JPG, PNG, WEBP</div>
+      <div class="dz-title">Tap untuk pilih foto</div>
+      <div class="dz-sub">Bisa pilih banyak sekaligus · JPG, PNG, WEBP</div>
     </div>
     <div id="photo-queue"></div>
+    <button id="add-more-btn" style="display:none;width:100%;margin-top:10px;padding:10px;background:var(--surface2);border:1px dashed var(--border);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:0.85rem;border-radius:9px;cursor:pointer;" onclick="document.getElementById('photos-input').click()">
+      + Tambah foto lagi
+    </button>
   </div>
 
   <!-- Process -->
@@ -297,11 +301,21 @@
   let resultBlobs = [];
 
   // Drag highlight
-  ['wm-zone','photos-zone'].forEach(id => {
+  ['wm-zone'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag'); });
     el.addEventListener('dragleave', () => el.classList.remove('drag'));
     el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('drag'); });
+  });
+
+  // Drag-drop for photos zone (desktop)
+  const pZone = document.getElementById('photos-zone');
+  pZone.addEventListener('dragover', e => { e.preventDefault(); pZone.classList.add('drag'); });
+  pZone.addEventListener('dragleave', () => pZone.classList.remove('drag'));
+  pZone.addEventListener('drop', e => {
+    e.preventDefault(); pZone.classList.remove('drag');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (files.length) { photoFiles = [...photoFiles, ...files]; renderQueue(); checkReady(); }
   });
 
   // Opacity slider
@@ -337,10 +351,12 @@
     checkReady();
   }
 
-  // Photos upload
+  // Photos upload — append so "add more" works
   document.getElementById('photos-input').addEventListener('change', function() {
     if (!this.files.length) return;
-    photoFiles = Array.from(this.files);
+    const newFiles = Array.from(this.files).filter(f => f.type.startsWith('image/'));
+    photoFiles = [...photoFiles, ...newFiles];
+    this.value = ''; // reset so same file can be re-selected
     renderQueue();
     checkReady();
   });
@@ -357,6 +373,9 @@
       item.innerHTML = `<img src="${url}"><span>${f.name}</span><span class="status wait" id="qs-${i}">menunggu</span>`;
       q.appendChild(item);
     });
+    // Hide dropzone, show add-more button
+    document.getElementById('photos-zone').style.display = photoFiles.length ? 'none' : '';
+    document.getElementById('add-more-btn').style.display = photoFiles.length ? 'block' : 'none';
   }
 
   function checkReady() {
@@ -497,6 +516,8 @@
     document.getElementById('wm-zone').style.display = '';
     document.getElementById('photo-queue').style.display = 'none';
     document.getElementById('photo-queue').innerHTML = '';
+    document.getElementById('photos-zone').style.display = '';
+    document.getElementById('add-more-btn').style.display = 'none';
     document.getElementById('results-section').style.display = 'none';
     document.getElementById('results-grid').innerHTML = '';
     document.getElementById('process-btn').style.display = 'none';
