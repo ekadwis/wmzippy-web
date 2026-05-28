@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auto Watermark Tool</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #232323;
+    --border: #2e2e2e;
+    --accent: #e8ff47;
+    --accent2: #47ffe8;
+    --text: #f0f0f0;
+    --muted: #777;
+    --radius: 12px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+
+  header {
+    max-width: 680px;
+    margin: 0 auto 36px;
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+  }
+
+  .logo {
+    width: 40px; height: 40px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+
+  .logo svg { width: 22px; height: 22px; }
+
+  header h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  header p {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    margin-top: 2px;
+  }
+
+  .container { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  .card-label {
+    font-size: 0.72rem;
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  /* Drop zones */
+  .dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: rgba(232,255,71,0.04); }
+  .dropzone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .dropzone .icon { font-size: 1.8rem; margin-bottom: 8px; }
+  .dropzone .dz-title { font-size: 0.92rem; font-weight: 500; }
+  .dropzone .dz-sub { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+
+  /* Watermark preview */
+  #wm-preview-wrap { display: none; align-items: center; gap: 12px; margin-top: 12px; background: var(--surface2); border-radius: 8px; padding: 10px 14px; }
+  #wm-preview-wrap img { width: 48px; height: 48px; object-fit: contain; border-radius: 6px; background: #fff2; }
+  #wm-name { font-size: 0.85rem; }
+  #wm-change { font-size: 0.75rem; font-family: 'DM Mono', monospace; color: var(--accent); cursor: pointer; text-decoration: underline; margin-left: auto; }
+
+  /* Opacity slider */
+  .slider-row { display: flex; align-items: center; gap: 14px; }
+  .slider-row label { font-size: 0.85rem; white-space: nowrap; }
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    border-radius: 4px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+  #opacity-val { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--accent); min-width: 36px; text-align: right; }
+
+  /* Photo queue */
+  #photo-queue { display: none; flex-direction: column; gap: 8px; margin-top: 12px; max-height: 200px; overflow-y: auto; }
+  .photo-item { display: flex; align-items: center; gap: 10px; background: var(--surface2); border-radius: 8px; padding: 8px 12px; }
+  .photo-item img { width: 36px; height: 36px; object-fit: cover; border-radius: 5px; }
+  .photo-item span { font-size: 0.82rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .photo-item .status { font-size: 0.75rem; font-family: 'DM Mono', monospace; }
+  .photo-item .status.done { color: var(--accent); }
+  .photo-item .status.err { color: #ff6b6b; }
+  .photo-item .status.wait { color: var(--muted); }
+
+  /* Button */
+  #process-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: #0f0f0f;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    letter-spacing: -0.01em;
+    display: none;
+  }
+  #process-btn:hover { opacity: 0.88; }
+  #process-btn:active { transform: scale(0.98); }
+  #process-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Progress bar */
+  #progress-wrap { display: none; }
+  #progress-bar-bg { height: 5px; background: var(--border); border-radius: 99px; overflow: hidden; margin-top: 10px; }
+  #progress-bar { height: 100%; background: var(--accent); border-radius: 99px; width: 0%; transition: width 0.2s; }
+  #progress-text { font-size: 0.78rem; font-family: 'DM Mono', monospace; color: var(--muted); margin-top: 6px; }
+
+  /* Results */
+  #results-section { display: none; }
+  #results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+  .result-item { background: var(--surface2); border-radius: 8px; overflow: hidden; position: relative; }
+  .result-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+  .result-item .r-name { font-size: 0.7rem; font-family: 'DM Mono', monospace; color: var(--muted); padding: 5px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .result-item a.dl-btn {
+    position: absolute; top: 6px; right: 6px;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 5px 7px;
+    font-size: 0.7rem;
+    color: #fff;
+    text-decoration: none;
+    backdrop-filter: blur(6px);
+    transition: background 0.15s;
+  }
+  .result-item a.dl-btn:hover { background: var(--accent); color: #000; }
+
+  #dl-all-btn {
+    width: 100%;
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--surface2);
+    border: 1.5px solid var(--accent2);
+    color: var(--accent2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  #dl-all-btn:hover { background: rgba(71,255,232,0.08); }
+
+  #reset-btn {
+    width: 100%; margin-top: 8px;
+    padding: 11px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  #reset-btn:hover { border-color: #555; color: var(--text); }
+
+  /* scrollbar */
+  #photo-queue::-webkit-scrollbar { width: 4px; }
+  #photo-queue::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#0f0f0f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="3"/>
+      <path d="M3 9h18M9 21V9"/>
+    </svg>
+  </div>
+  <div>
+    <h1>Auto Watermark Tool</h1>
+    <p>upload · proses · download — semua di browser</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Step 1: Watermark -->
+  <div class="card">
+    <div class="card-label">01 — Watermark PNG</div>
+    <div class="dropzone" id="wm-zone">
+      <input type="file" id="wm-input" accept="image/png,image/webp,image/jpeg" />
+      <div class="icon">🖼️</div>
+      <div class="dz-title">Upload file watermark</div>
+      <div class="dz-sub">PNG transparan direkomendasikan</div>
+    </div>
+    <div id="wm-preview-wrap">
+      <img id="wm-thumb" src="" alt="wm" />
+      <span id="wm-name">—</span>
+      <span id="wm-change" onclick="resetWatermark()">Ganti</span>
+    </div>
+  </div>
+
+  <!-- Opacity -->
+  <div class="card">
+    <div class="card-label">02 — Opacity Watermark</div>
+    <div class="slider-row">
+      <label>Transparansi</label>
+      <input type="range" id="opacity-slider" min="10" max="100" value="60" />
+      <span id="opacity-val">60%</span>
+    </div>
+  </div>
+
+  <!-- Step 2: Photos -->
+  <div class="card">
+    <div class="card-label">03 — Foto Testimoni</div>
+    <div class="dropzone" id="photos-zone">
+      <input type="file" id="photos-input" accept="image/*" multiple />
+      <div class="icon">📸</div>
+      <div class="dz-title">Upload foto (bisa banyak sekaligus)</div>
+      <div class="dz-sub">JPG, PNG, WEBP</div>
+    </div>
+    <div id="photo-queue"></div>
+  </div>
+
+  <!-- Process -->
+  <button id="process-btn" onclick="processAll()">⚡ Proses Watermark</button>
+
+  <!-- Progress -->
+  <div class="card" id="progress-wrap">
+    <div class="card-label">Memproses...</div>
+    <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+    <div id="progress-text">0 / 0</div>
+  </div>
+
+  <!-- Results -->
+  <div class="card" id="results-section">
+    <div class="card-label">✅ Hasil</div>
+    <div id="results-grid"></div>
+    <button id="dl-all-btn" onclick="downloadAll()">⬇ Download Semua (ZIP)</button>
+    <button id="reset-btn" onclick="resetAll()">🔄 Mulai Ulang</button>
+  </div>
+
+</div>
+
+<!-- JSZip for bulk download -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+  let wmImage = null;
+  let photoFiles = [];
+  let resultBlobs = [];
+
+  // Drag highlight
+  ['wm-zone','photos-zone'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drag'));
+    el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('drag'); });
+  });
+
+  // Opacity slider
+  const slider = document.getElementById('opacity-slider');
+  const opVal  = document.getElementById('opacity-val');
+  slider.addEventListener('input', () => opVal.textContent = slider.value + '%');
+
+  // Watermark upload
+  document.getElementById('wm-input').addEventListener('change', function() {
+    if (!this.files[0]) return;
+    loadWatermark(this.files[0]);
+  });
+
+  function loadWatermark(file) {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      wmImage = img;
+      document.getElementById('wm-thumb').src = url;
+      document.getElementById('wm-name').textContent = file.name;
+      document.getElementById('wm-preview-wrap').style.display = 'flex';
+      document.getElementById('wm-zone').style.display = 'none';
+      checkReady();
+    };
+    img.src = url;
+  }
+
+  function resetWatermark() {
+    wmImage = null;
+    document.getElementById('wm-preview-wrap').style.display = 'none';
+    document.getElementById('wm-zone').style.display = '';
+    document.getElementById('wm-input').value = '';
+    checkReady();
+  }
+
+  // Photos upload
+  document.getElementById('photos-input').addEventListener('change', function() {
+    if (!this.files.length) return;
+    photoFiles = Array.from(this.files);
+    renderQueue();
+    checkReady();
+  });
+
+  function renderQueue() {
+    const q = document.getElementById('photo-queue');
+    q.innerHTML = '';
+    q.style.display = 'flex';
+    photoFiles.forEach((f, i) => {
+      const url = URL.createObjectURL(f);
+      const item = document.createElement('div');
+      item.className = 'photo-item';
+      item.id = 'qi-' + i;
+      item.innerHTML = `<img src="${url}"><span>${f.name}</span><span class="status wait" id="qs-${i}">menunggu</span>`;
+      q.appendChild(item);
+    });
+  }
+
+  function checkReady() {
+    const btn = document.getElementById('process-btn');
+    btn.style.display = (wmImage && photoFiles.length > 0) ? 'block' : 'none';
+  }
+
+  // Core: apply watermark
+  function applyWatermark(photoFile, wmImg, opacity) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const photo = new Image();
+        photo.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width  = photo.width;
+          canvas.height = photo.height;
+          const ctx = canvas.getContext('2d');
+
+          // Draw photo
+          ctx.drawImage(photo, 0, 0);
+
+          // Scale watermark to cover (same as Python: max(scale_x, scale_y))
+          const scaleX = photo.width  / wmImg.width;
+          const scaleY = photo.height / wmImg.height;
+          const scale  = Math.max(scaleX, scaleY);
+          const newW   = wmImg.width  * scale;
+          const newH   = wmImg.height * scale;
+          const x      = (photo.width  - newW) / 2;
+          const y      = (photo.height - newH) / 2;
+
+          // Draw watermark with opacity
+          ctx.globalAlpha = opacity;
+          ctx.drawImage(wmImg, x, y, newW, newH);
+          ctx.globalAlpha = 1;
+
+          const isJpeg = !photoFile.name.toLowerCase().endsWith('.png');
+          const mime   = isJpeg ? 'image/jpeg' : 'image/png';
+          canvas.toBlob(blob => resolve({ blob, name: 'wm_' + photoFile.name, mime }), mime, 0.95);
+        };
+        photo.onerror = reject;
+        photo.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(photoFile);
+    });
+  }
+
+  async function processAll() {
+    const opacity = parseInt(slider.value) / 100;
+    const btn = document.getElementById('process-btn');
+    btn.disabled = true;
+
+    resultBlobs = [];
+
+    const pw = document.getElementById('progress-wrap');
+    pw.style.display = 'block';
+    document.getElementById('results-section').style.display = 'none';
+
+    const total = photoFiles.length;
+    let done = 0;
+
+    const grid = document.getElementById('results-grid');
+    grid.innerHTML = '';
+
+    for (let i = 0; i < photoFiles.length; i++) {
+      const statusEl = document.getElementById('qs-' + i);
+      statusEl.textContent = 'proses...';
+      statusEl.className = 'status wait';
+
+      try {
+        const result = await applyWatermark(photoFiles[i], wmImage, opacity);
+        resultBlobs.push(result);
+
+        // Status
+        statusEl.textContent = '✓ selesai';
+        statusEl.className = 'status done';
+
+        // Add to results grid
+        const url = URL.createObjectURL(result.blob);
+        const item = document.createElement('div');
+        item.className = 'result-item';
+        item.innerHTML = `
+          <img src="${url}" loading="lazy">
+          <div class="r-name">${result.name}</div>
+          <a class="dl-btn" href="${url}" download="${result.name}">↓</a>
+        `;
+        grid.appendChild(item);
+
+      } catch(err) {
+        const statusEl2 = document.getElementById('qs-' + i);
+        statusEl2.textContent = '✗ gagal';
+        statusEl2.className = 'status err';
+      }
+
+      done++;
+      const pct = Math.round(done / total * 100);
+      document.getElementById('progress-bar').style.width = pct + '%';
+      document.getElementById('progress-text').textContent = `${done} / ${total} foto`;
+
+      // Yield to browser
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    pw.style.display = 'none';
+    document.getElementById('results-section').style.display = 'block';
+    btn.disabled = false;
+  }
+
+  async function downloadAll() {
+    if (!resultBlobs.length) return;
+    const dlBtn = document.getElementById('dl-all-btn');
+    dlBtn.textContent = '⏳ Membuat ZIP...';
+    dlBtn.disabled = true;
+
+    const zip = new JSZip();
+    for (const r of resultBlobs) {
+      zip.file(r.name, r.blob);
+    }
+    const content = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(content);
+    a.download = 'watermark_hasil.zip';
+    a.click();
+
+    dlBtn.textContent = '⬇ Download Semua (ZIP)';
+    dlBtn.disabled = false;
+  }
+
+  function resetAll() {
+    wmImage = null;
+    photoFiles = [];
+    resultBlobs = [];
+
+    document.getElementById('wm-input').value = '';
+    document.getElementById('photos-input').value = '';
+    document.getElementById('wm-preview-wrap').style.display = 'none';
+    document.getElementById('wm-zone').style.display = '';
+    document.getElementById('photo-queue').style.display = 'none';
+    document.getElementById('photo-queue').innerHTML = '';
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('results-grid').innerHTML = '';
+    document.getElementById('process-btn').style.display = 'none';
+    document.getElementById('progress-wrap').style.display = 'none';
+    document.getElementById('progress-bar').style.width = '0%';
+    slider.value = 60;
+    opVal.textContent = '60%';
+  }
+</script>
+</body>
+</html>
